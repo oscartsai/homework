@@ -125,17 +125,27 @@ def learn(env,
     # And then you can obtain the variables like this:
     # q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
     # Older versions of TensorFlow may require using "VARIABLES" instead of "GLOBAL_VARIABLES"
-    ######
-    
-    # YOUR CODE HERE
 
+    ######
+    # YOUR CODE HERE
+    q_t = q_func(obs_t_float, num_actions, scope="q_func", reuse=False)
+    q_tp1 = q_func(obs_tp1_float, num_actions, scope="target_q_func", reuse=False)
+    target_value = rew_t_ph + done_mask_ph * gamma * tf.reduce_max(q_tp1, axis=0, keep_dims=True)
+    act_mask = tf.onehot(act_t_ph, depth=num_actions)
+    total_error = tf.reduce_sum(act_mask * (target_value - q_t))
+
+    q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
+    target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
+
+    init = tf.global_variables_initializer()
+    session.run(init)
     ######
 
     # construct optimization op (with gradient clipping)
     learning_rate = tf.placeholder(tf.float32, (), name="learning_rate")
     optimizer = optimizer_spec.constructor(learning_rate=learning_rate, **optimizer_spec.kwargs)
     train_fn = minimize_and_clip(optimizer, total_error,
-                 var_list=q_func_vars, clip_val=grad_norm_clipping)
+                                 var_list=q_func_vars, clip_val=grad_norm_clipping)
 
     # update_target_fn will be called periodically to copy Q network to target Q network
     update_target_fn = []
@@ -150,7 +160,7 @@ def learn(env,
     ###############
     # RUN ENV     #
     ###############
-    model_initialized = False
+    model_initialized = True
     num_param_updates = 0
     mean_episode_reward      = -float('nan')
     best_mean_episode_reward = -float('inf')
@@ -193,8 +203,23 @@ def learn(env,
         # might as well be random, since you haven't trained your net...)
 
         #####
-        
         # YOUR CODE HERE
+        idx = replay_buffer.store_frame(last_obs)
+
+        if np.random.rand() < exploration.value(t):
+            action = np.random.choice(num_actions)
+        else:
+            obs_encoded = replay_buffer.encode_recent_observation()
+            q_values = session.run(obs_t_ph, feed_dict={obs_t_ph: obs_encoded})
+            action = np.argmax(q_values)
+
+        obs_tp1, reward, done, info = env.step(action)
+        store_effect(idx, action, reward, done)
+
+        if done:
+            last_obs = env.reset()
+        else:
+            last_obs = obs_tp1
 
         #####
 
@@ -214,6 +239,9 @@ def learn(env,
             # replay buffer code for function definition, each batch that you sample
             # should consist of current observations, current actions, rewards,
             # next observations, and done indicator).
+            #
+            obs_batch, act_batch, rew_batch, next_obs_batch, done_batch = replay_buffer.sample(batch_size)
+
             # 3.b: initialize the model if it has not been initialized yet; to do
             # that, call
             #    initialize_interdependent_variables(session, tf.global_variables(), {
@@ -224,6 +252,7 @@ def learn(env,
             # the current and next time step. The boolean variable model_initialized
             # indicates whether or not the model has been initialized.
             # Remember that you have to update the target network too (see 3.d)!
+            #
             # 3.c: train the model. To do this, you'll need to use the train_fn and
             # total_error ops that were created earlier: total_error is what you
             # created to compute the total Bellman error in a batch, and train_fn
@@ -238,12 +267,24 @@ def learn(env,
             # (this is needed for computing total_error)
             # learning_rate -- you can get this from optimizer_spec.lr_schedule.value(t)
             # (this is needed by the optimizer to choose the learning rate)
+            #
+            session.run(train_fn, feed_dict={obs_t_ph: obs_batch,
+                                             act_t_ph: act_batch,
+                                             rew_t_ph: rew_batch,
+                                             obs_tp1_ph: next_obs_batch,
+                                             done_mask_ph: done_batch,
+                                             learning_rate: optimizer_spec.lr_schedule.value(t)})
+
             # 3.d: periodically update the target network by calling
             # session.run(update_target_fn)
             # you should update every target_update_freq steps, and you may find the
             # variable num_param_updates useful for this (it was initialized to 0)
-            #####
-            
+            #
+            if t % target_update_freq == 0:
+                session.run(update_target_fn)
+                num_param_updates += 1
+
+        #####
             # YOUR CODE HERE
 
             #####
