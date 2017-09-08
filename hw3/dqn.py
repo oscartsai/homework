@@ -131,7 +131,7 @@ def learn(env,
     q_t = q_func(obs_t_float, num_actions, scope="q_func", reuse=False)
     q_tp1 = q_func(obs_tp1_float, num_actions, scope="target_q_func", reuse=False)
     target_value = rew_t_ph + done_mask_ph * gamma * tf.reduce_max(q_tp1, axis=0, keep_dims=True)
-    act_mask = tf.onehot(act_t_ph, depth=num_actions)
+    act_mask = tf.one_hot(act_t_ph, depth=num_actions)
     total_error = tf.reduce_sum(act_mask * (target_value - q_t))
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
@@ -210,11 +210,11 @@ def learn(env,
             action = np.random.choice(num_actions)
         else:
             obs_encoded = replay_buffer.encode_recent_observation()
-            q_values = session.run(obs_t_ph, feed_dict={obs_t_ph: obs_encoded})
+            q_values = session.run(q_t, feed_dict={obs_t_ph: obs_encoded[None,:]})
             action = np.argmax(q_values)
 
         obs_tp1, reward, done, info = env.step(action)
-        store_effect(idx, action, reward, done)
+        replay_buffer.store_effect(idx, action, reward, done)
 
         if done:
             last_obs = env.reset()
