@@ -132,7 +132,7 @@ def learn(env,
     q_tp1 = q_func(obs_tp1_float, num_actions, scope="target_q_func", reuse=False)
     target_value = rew_t_ph + done_mask_ph * gamma * tf.reduce_max(q_tp1, axis=1)
     act_mask = tf.one_hot(act_t_ph, depth=num_actions)
-    total_error = tf.reduce_sum(target_value - tf.reduce_sum(act_mask*q_t, axis=1))
+    total_error = tf.reduce_sum(tf.square(target_value - tf.reduce_sum(act_mask*q_t, axis=1)))
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
