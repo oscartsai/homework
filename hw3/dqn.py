@@ -130,15 +130,15 @@ def learn(env,
     # YOUR CODE HERE
     q_t = q_func(obs_t_float, num_actions, scope="q_func", reuse=False)
     q_tp1 = q_func(obs_tp1_float, num_actions, scope="target_q_func", reuse=False)
-    target_value = rew_t_ph + done_mask_ph * gamma * tf.reduce_max(q_tp1, axis=0, keep_dims=True)
+    target_value = rew_t_ph + done_mask_ph * gamma * tf.reduce_max(q_tp1, axis=1)
     act_mask = tf.one_hot(act_t_ph, depth=num_actions)
-    total_error = tf.reduce_sum(act_mask * (target_value - q_t))
+    total_error = tf.reduce_sum(target_value - tf.reduce_sum(act_mask*q_t, axis=1))
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
 
-    init = tf.global_variables_initializer()
-    session.run(init)
+    # init = tf.global_variables_initializer()
+    # session.run(init)
     ######
 
     # construct optimization op (with gradient clipping)
@@ -160,12 +160,19 @@ def learn(env,
     ###############
     # RUN ENV     #
     ###############
-    model_initialized = True
+    model_initialized = False
     num_param_updates = 0
     mean_episode_reward      = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
     LOG_EVERY_N_STEPS = 10000
+
+    # YOUR CODE HERE
+    if not model_initialized:
+        initialize_interdependent_variables(session, tf.global_variables(), {})
+        session.run(update_target_fn)
+        model_initialized = True
+    ###
 
     for t in itertools.count():
         ### 1. Check stopping criterion
@@ -275,19 +282,19 @@ def learn(env,
                                              done_mask_ph: done_batch,
                                              learning_rate: optimizer_spec.lr_schedule.value(t)})
 
-            # 3.d: periodically update the target network by calling
-            # session.run(update_target_fn)
-            # you should update every target_update_freq steps, and you may find the
-            # variable num_param_updates useful for this (it was initialized to 0)
-            #
-            if t % target_update_freq == 0:
-                session.run(update_target_fn)
-                num_param_updates += 1
+        # 3.d: periodically update the target network by calling
+        # session.run(update_target_fn)
+        # you should update every target_update_freq steps, and you may find the
+        # variable num_param_updates useful for this (it was initialized to 0)
+        #
+        if t % target_update_freq == 0:
+            session.run(update_target_fn)
+            num_param_updates += 1
 
         #####
-            # YOUR CODE HERE
+        # YOUR CODE HERE
 
-            #####
+        #####
 
         ### 4. Log progress
         episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
