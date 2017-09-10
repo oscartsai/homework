@@ -67,7 +67,7 @@ def atari_learn(env,
         session=session,
         exploration=exploration_schedule,
         stopping_criterion=stopping_criterion,
-        replay_buffer_size=100000,
+        replay_buffer_size=500000,
         batch_size=32,
         gamma=0.99,
         learning_starts=50000,
@@ -89,7 +89,7 @@ def set_global_seeds(i):
     except ImportError:
         pass
     else:
-        tf.set_random_seed(i) 
+        tf.set_random_seed(i)
     np.random.seed(i)
     random.seed(i)
 

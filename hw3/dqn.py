@@ -87,6 +87,7 @@ def learn(env,
     else:
         img_h, img_w, img_c = env.observation_space.shape
         input_shape = (img_h, img_w, frame_history_len * img_c)
+
     num_actions = env.action_space.n
 
     # set up placeholders
@@ -128,17 +129,14 @@ def learn(env,
 
     ######
     # YOUR CODE HERE
-    q_t = q_func(obs_t_float, num_actions, scope="q_func", reuse=False)
-    q_tp1 = q_func(obs_tp1_float, num_actions, scope="target_q_func", reuse=False)
-    target_value = rew_t_ph + done_mask_ph * gamma * tf.reduce_max(q_tp1, axis=1)
+    q_t = q_func(obs_t_float, num_actions, scope='q_func', reuse=False)
+    q_tp1 = q_func(obs_tp1_float, num_actions, scope='target_q_func', reuse=False)
+    target_value = rew_t_ph + (1 - done_mask_ph) * gamma * tf.reduce_max(q_tp1, axis=1)
     act_mask = tf.one_hot(act_t_ph, depth=num_actions)
     total_error = tf.reduce_sum(tf.square(target_value - tf.reduce_sum(act_mask*q_t, axis=1)))
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_func')
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_q_func')
-
-    # init = tf.global_variables_initializer()
-    # session.run(init)
     ######
 
     # construct optimization op (with gradient clipping)
@@ -152,6 +150,7 @@ def learn(env,
     for var, var_target in zip(sorted(q_func_vars,        key=lambda v: v.name),
                                sorted(target_q_func_vars, key=lambda v: v.name)):
         update_target_fn.append(var_target.assign(var))
+
     update_target_fn = tf.group(*update_target_fn)
 
     # construct the replay buffer
@@ -172,6 +171,8 @@ def learn(env,
         initialize_interdependent_variables(session, tf.global_variables(), {})
         session.run(update_target_fn)
         model_initialized = True
+        # init = tf.global_variables_initializer()
+        # session.run(init)
     ###
 
     for t in itertools.count():
@@ -227,7 +228,6 @@ def learn(env,
             last_obs = env.reset()
         else:
             last_obs = obs_tp1
-
         #####
 
         # at this point, the environment should have been advanced one step (and
@@ -293,7 +293,6 @@ def learn(env,
 
         #####
         # YOUR CODE HERE
-
         #####
 
         ### 4. Log progress
